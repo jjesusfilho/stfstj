@@ -4,7 +4,8 @@
 \alias{stf_opinion_metadata}
 \title{Returns metadada from Brazilian Supreme Court precedents}
 \usage{
-stf_opinion_metadata(open_search, dt_start, dt_end, parties_names = TRUE)
+stf_opinion_metadata(open_search = NULL, dt_start = "", dt_end = "",
+  parties_names = TRUE)
 }
 \arguments{
 \item{open_search}{Words to be searched}

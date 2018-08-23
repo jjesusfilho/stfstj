@@ -6,28 +6,43 @@ stf_url<-function(x,y,w){
 ## y will take the query parameter according to the options selected for the parameter database from stf_metadata function.
   
 
-## Build url based on search, start and end parameters
+## Builds url based on search, start and end parameters ####
   url1<-"http://www.stf.jus.br/portal/jurisprudencia/listarConsolidada.asp?base=baseAcordaos"
  
-  url1<-httr::modify_url(url1,query=list(txtPesquisaLivre=x,dataFinal=w,dataInicial=y))
+  if(y==""&&w!=""){
+    url1<-httr::modify_url(url1,query=list(txtPesquisaLivre=x,dataFinal=w))
+    
+  } else if(w=="" && y!="") {
+    url1<-httr::modify_url(url1,query=list(txtPesquisaLivre=x,dataInicial=y))
+    
+  } else if(y=="" && w==""){
+    
+    url1<-httr::modify_url(url1,query=list(txtPesquisaLivre=x))
+    
+    
+  } else
   
-## Encodes the URL replacing specially spaces by "%" plus the hexadecimal representation
+  url1<-httr::modify_url(url1,query=list(txtPesquisaLivre=x,dataFinal=w,dataInicial=y))
 
-## Gets the number of precedents
-  numero_tinyurl<-httr::GET(url1) %>% 
+### End of building url ####  
+
+## Gets the number of precedents, number of pages to build new urls ####
+  numero_tinyurl<-httr::RETRY("GET",url1,httr::timeout(30)) %>% 
     httr::content() %>% 
     xml2::xml_find_all("//*[@class='linkPagina']|//*[@class='linkPagina']/@href") %>%
     xml2::xml_text()
 
-## 
+
   paginas<-stringr::str_extract(numero_tinyurl[[1]],"\\d+") %>% 
     as.numeric() %>% 
     magrittr::divide_by(10) %>% 
     ceiling()
   tinyURL<-numero_tinyurl[[2]]
-  urls <- stringr::str_c("http://www.stf.jus.br/portal/jurisprudencia/",tinyURL,"&pagina=",1:paginas)
+
+urls <- stringr::str_c("http://www.stf.jus.br/portal/jurisprudencia/",tinyURL,"&pagina=",1:paginas)
+### End of build new urls ####
 }
-# End of the function
+# End of the function ####
 
 # This functions encapsulates the previous function in the purrr::possibly function for the control
 # errors and the absense of results in the specified database. So this the actual function
@@ -36,7 +51,7 @@ stf_url<-function(x,y,w){
 stf_urls<-purrr::possibly(stf_url,"ignore")
 # End of the function
 
-# STF parties description is very messy. This functions does its best to correct all the parties descriptions.
+# STF parties description is very messy. This functions does its best to correct all the parties descriptions. ####
 stf_parties_names<-function(z){
   z %>% 
     purrr::map_chr(~{
@@ -71,7 +86,7 @@ stf_parties_names<-function(z){
       
     })
 }
-# End of the function
+# End of the function ####
 
 # This is the main function. It collects all the metadata from the Brazilian 
 # Supreme Court panel opinion. 
@@ -89,9 +104,8 @@ stf_parties_names<-function(z){
 #' @return Dataframe with the metadata
 #' 
 #' @export
-stf_opinion_metadata<-function(open_search,dt_start,dt_end,parties_names=TRUE){
-
-
+stf_opinion_metadata<-function(open_search=NULL,dt_start="",dt_end="",parties_names=TRUE){
+  
 
 ## calls the stf_urls function to grab all urls. 
   urls<-stf_urls(x=open_search,y=dt_start,w=dt_end)
@@ -101,11 +115,11 @@ stf_opinion_metadata<-function(open_search,dt_start,dt_end,parties_names=TRUE){
 
 ## This whole chunck collects the content of every ten precedents loaded by the urls                         
   
-urls %>% purrr::map_dfr(purrr::possibly(~{
+s<-urls %>% purrr::map_dfr(purrr::possibly(~{
 
 ## Grabs the parsed page.        
     principal<- .x %>% 
-      httr::GET() %>% 
+      httr::RETRY("GET",.,httr::timeout(30)) %>% 
       httr::content() 
 
 ## Unfortunately, stf doesn't have a tag for every element of the metadata.
@@ -261,7 +275,9 @@ urls %>% purrr::map_dfr(purrr::possibly(~{
     
   },data.frame(processo=NA_character_,origem=NA_character_,classe=NA_character_,relator=NA_character_,relator_acordao=NA_character_,data_julgamento=NA_character_,data_publicacao=NA_character_,orgao_julgador=NA_character_,eletronico=NA,ementa=NA_character_,voto=NA_character_,decisao=NA_character_,url_inteiro_teor=NA_character_,url_andamento=NA_character_,partes=NA_character_),
   quiet = FALSE
-  ))
+  ),.id="pagina")
+
+
 }
 
 
